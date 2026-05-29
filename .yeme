@@ -1,12 +1,305 @@
 --[[
-    Roblox Eat the World Specially Tailored Auto-Farm Script
+    Roblox Eat the World Auto-Farm Script
+    Created for loadstring execution or direct executor injection.
+    
+    Usage:
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/autofarm.lua"))()
+--]]
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+-- Configuration variables (can be adjusted via UI or manually)
+local Config = {
+    AutoFarm = false,
+    AutoSell = false,
+    FarmSpeed = 45, -- Speed of tweening
+    FoodFolderNames = {"Food", "Foods", "Fruits", "SpawnedFood", "FoodSpawns", "WorldItems"},
+    SellPartNames = {"Sell", "SellArea", "SellRing", "SellPart", "SellPlace"},
+    MaxDistance = 1500 -- Max distance to search for food
+}
+-- UI Setup (Sleek Glassmorphic Toggle GUI)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EatWorldHub"
+ScreenGui.ResetOnSpawn = false
+-- Core Gui Protection if using supported executors
+if syn and syn.protect_gui then
+    syn.protect_gui(ScreenGui)
+elseif gethui then
+    ScreenGui.Parent = gethui()
+else
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 260, 0, 320)
+MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BackgroundTransparency = 0.15
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+-- Rounded corners
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+-- Title
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "Title"
+TitleLabel.Size = UDim2.new(1, 0, 0, 45)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "EAT THE WORLD HUB"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 16
+TitleLabel.Parent = MainFrame
+-- Status / Info Label
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Name = "Status"
+StatusLabel.Size = UDim2.new(1, 0, 0, 30)
+StatusLabel.Position = UDim2.new(0, 0, 0, 45)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Font = Enum.Font.GothamSemibold
+StatusLabel.Text = "Durum: Bekliyor..."
+StatusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+StatusLabel.TextSize = 12
+StatusLabel.Parent = MainFrame
+-- Toggle Button helper function
+local function createToggle(name, text, position, default, callback)
+    local Button = Instance.new("TextButton")
+    Button.Name = name
+    Button.Size = UDim2.new(0, 220, 0, 45)
+    Button.Position = position
+    Button.BackgroundColor3 = default and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(231, 76, 60)
+    Button.Font = Enum.Font.GothamBold
+    Button.Text = text .. ": " .. (default and "ACIK" or "KAPALI")
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 14
+    Button.Parent = MainFrame
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 8)
+    BtnCorner.Parent = Button
+    
+    local state = default
+    Button.MouseButton1Click:Connect(function()
+        state = not state
+        Button.BackgroundColor3 = state and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(231, 76, 60)
+        Button.Text = text .. ": " .. (state and "ACIK" or "KAPALI")
+        callback(state)
+    end)
+    return Button
+end
+-- Create Auto Farm Toggle
+createToggle("AutoFarmToggle", "Otomatik Yemek Ye", UDim2.new(0, 20, 0, 90), Config.AutoFarm, function(state)
+    Config.AutoFarm = state
+    if not state then
+        StatusLabel.Text = "Durum: Durduruldu"
+    end
+end)
+-- Create Auto Sell Toggle
+createToggle("AutoSellToggle", "Otomatik Sat", UDim2.new(0, 20, 0, 145), Config.AutoSell, function(state)
+    Config.AutoSell = state
+end)
+-- Speed Controls
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(1, 0, 0, 25)
+SpeedLabel.Position = UDim2.new(0, 0, 0, 205)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Font = Enum.Font.Gotham
+SpeedLabel.Text = "Ulasma Hizi: " .. Config.FarmSpeed
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.TextSize = 12
+SpeedLabel.Parent = MainFrame
+local SpeedUp = Instance.new("TextButton")
+SpeedUp.Size = UDim2.new(0, 100, 0, 30)
+SpeedUp.Position = UDim2.new(0, 20, 0, 235)
+SpeedUp.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SpeedUp.Font = Enum.Font.GothamBold
+SpeedUp.Text = "Hizlandir (+5)"
+SpeedUp.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedUp.TextSize = 12
+SpeedUp.Parent = MainFrame
+Instance.new("UICorner", SpeedUp).CornerRadius = UDim.new(0, 5)
+SpeedUp.MouseButton1Click:Connect(function()
+    Config.FarmSpeed = math.min(150, Config.FarmSpeed + 5)
+    SpeedLabel.Text = "Ulasma Hizi: " .. Config.FarmSpeed
+end)
+local SpeedDown = Instance.new("TextButton")
+SpeedDown.Size = UDim2.new(0, 100, 0, 30)
+SpeedDown.Position = UDim2.new(0, 140, 0, 235)
+SpeedDown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SpeedDown.Font = Enum.Font.GothamBold
+SpeedDown.Text = "Yavaslat (-5)"
+SpeedDown.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedDown.TextSize = 12
+SpeedDown.Parent = MainFrame
+Instance.new("UICorner", SpeedDown).CornerRadius = UDim.new(0, 5)
+SpeedDown.MouseButton1Click:Connect(function()
+    Config.FarmSpeed = math.max(10, Config.FarmSpeed - 5)
+    SpeedLabel.Text = "Ulasma Hizi: " .. Config.FarmSpeed
+end)
+-- Minimize Button
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+MinimizeBtn.Position = UDim2.new(1, -40, 0, 7)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.TextSize = 20
+MinimizeBtn.Parent = MainFrame
+local Minimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    Minimized = not Minimized
+    if Minimized then
+        MainFrame:TweenSize(UDim2.new(0, 260, 0, 45), "Out", "Quad", 0.3, true)
+        MinimizeBtn.Text = "+"
+    else
+        MainFrame:TweenSize(UDim2.new(0, 260, 0, 320), "Out", "Quad", 0.3, true)
+        MinimizeBtn.Text = "-"
+    end
+end)
+-- Core Auto Farm Mechanics
+-- Find Food Folder
+local function getFoodFolder()
+    for _, name in ipairs(Config.FoodFolderNames) do
+        local folder = workspace:FindFirstChild(name)
+        if folder then return folder end
+    end
+    -- Fallback: check workspace recursively for parts with food-related attributes or names
+    return nil
+end
+-- Find Sell Area
+local function getSellPart()
+    for _, name in ipairs(Config.SellPartNames) do
+        local part = workspace:FindFirstChild(name, true)
+        if part and part:IsA("BasePart") then
+            return part
+        end
+    end
+    return nil
+end
+-- Find Character Parts
+local function getCharacterParts()
+    local char = LocalPlayer.Character
+    if not char then return nil, nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return hrp, hum
+end
+-- Get Capacity Details (Looks at Leaderstats or common UI elements)
+local function isFull()
+    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+    if leaderstats then
+        local current = leaderstats:FindFirstChild("Food") or leaderstats:FindFirstChild("Weight") or leaderstats:FindFirstChild("Size")
+        local maxVal = leaderstats:FindFirstChild("MaxFood") or leaderstats:FindFirstChild("Capacity") or leaderstats:FindFirstChild("MaxWeight")
+        
+        if current and maxVal then
+            return current.Value >= maxVal.Value
+        end
+    end
+    
+    -- Fallback: check PlayerGui for text patterns like "Full", "100/100", etc.
+    return false
+end
+-- Move to target safely using Tween (prevents bans better than instant teleportation)
+local activeTween = nil
+local function moveTo(targetPosition, speed)
+    local hrp, hum = getCharacterParts()
+    if not hrp or not hum then return end
+    
+    local distance = (hrp.Position - targetPosition).Magnitude
+    local duration = distance / speed
+    
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    activeTween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPosition)})
+    activeTween:Play()
+    activeTween.Completed:Wait()
+    activeTween = nil
+end
+-- Find Nearest Food
+local function getNearestFood()
+    local hrp = getCharacterParts()
+    if not hrp then return nil end
+    
+    local folder = getFoodFolder()
+    local nearest = nil
+    local shortestDistance = Config.MaxDistance
+    
+    local function checkItem(item)
+        if item:IsA("BasePart") or (item:IsA("Model") and item.PrimaryPart) then
+            local pos = item:IsA("BasePart") and item.Position or item.PrimaryPart.Position
+            local dist = (hrp.Position - pos).Magnitude
+            if dist < shortestDistance then
+                shortestDistance = dist
+                nearest = item
+            end
+        end
+    end
+    
+    if folder then
+        for _, child in ipairs(folder:GetChildren()) do
+            checkItem(child)
+        end
+    else
+        -- Search top level workspace if folder not found
+        for _, child in ipairs(workspace:GetChildren()) do
+            if child.Name:lower():find("food") or child.Name:lower():find("fruit") then
+                checkItem(child)
+            end
+        end
+    end
+    
+    return nearest
+end
+-- Main Loop
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        
+        if Config.AutoFarm then
+            local hrp, hum = getCharacterParts()
+            if hrp and hum then
+                -- Check if full and AutoSell is enabled
+                if Config.AutoSell and isFull() then
+                    StatusLabel.Text = "Durum: Cantan Dolu! Satiliyor..."
+                    local sellPart = getSellPart()
+                    if sellPart then
+                        moveTo(sellPart.Position, Config.FarmSpeed)
+                        task.wait(0.5) -- Wait to ensure sell completes
+                    else
+                        StatusLabel.Text = "Hata: Satis alani bulunamadi!"
+                    end
+                else
+                    -- Farm nearest food
+                    local food = getNearestFood()
+                    if food then
+                        StatusLabel.Text = "Durum: Yiyecege gidiliyor..."
+                        local targetPos = food:IsA("BasePart") and food.Position or food.PrimaryPart.Position
+                        
+                        -- Offset height slightly to align with center
+                        targetPos = targetPos + Vector3.new(0, 1, 0)
+                        moveTo(targetPos, Config.FarmSpeed)
+                    else
+                        StatusLabel.Text = "Durum: Yiyecek araniyor..."
+                    end
+                end
+            end
+        end
+    end
+end)
+print("Eat the World Hub successfully loaded!")
+--[[
+    Roblox Eat the World Tailored Auto-Farm Script
     Created for MM2Script-Maker / OverdriveHub
     
-    This script is specifically optimized for Eat the World simulators on Roblox.
-    Features:
-    - Extremely safe execution check (pcall GUI creation)
-    - Auto Eat: Teleports Food (Cubes/Boxes) directly to the player OR Tweens the player to the Food.
-    - Auto Sell: Smoothly travels to the sell rings when the capacity is full.
+    WORKING LOGIC:
+    - Eat the World uses ClickDetectors inside map parts (Cubes, Blocks, Trees).
+    - This script finds the nearest Part with a ClickDetector and fires it.
+    - If needed, the player is moved within range of the ClickDetector.
+    - When leaderstats capacity is reached, it moves to the Sell area.
 --]]
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -15,13 +308,11 @@ local LocalPlayer = Players.LocalPlayer
 local Config = {
     AutoFarm = false,
     AutoSell = false,
-    FarmMethod = "Walk to Food",
     FarmSpeed = 60,
-    MaxDistance = 2000,
-    FoodNames = {"Cube", "Box", "Food", "Fruit", "Apple", "Banana", "Orange", "Eatable", "Weight", "Size"},
-    FoodFolderNames = {"Food", "Foods", "Fruits", "SpawnedFood", "FoodSpawns", "WorldItems", "Cubes", "Boxes"}
+    MaxDistance = 1500,
+    ActivationRange = 25 -- Max distance to fire the click detector
 }
--- Safe GUI creation
+-- UI Setup (Premium Dark Neon Theme)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "EatWorldProHub"
 ScreenGui.ResetOnSpawn = false
@@ -43,7 +334,7 @@ if not success or not ScreenGui.Parent then
 end
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 280, 0, 410)
+MainFrame.Size = UDim2.new(0, 280, 0, 360)
 MainFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BackgroundTransparency = 0.1
@@ -74,7 +365,7 @@ StatusLabel.Size = UDim2.new(1, 0, 0, 30)
 StatusLabel.Position = UDim2.new(0, 0, 0, 45)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Font = Enum.Font.GothamSemibold
-StatusLabel.Text = "Durum: Script Yuklendi."
+StatusLabel.Text = "Durum: Script Calismaya Hazir."
 StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 StatusLabel.TextSize = 12
 StatusLabel.Parent = MainFrame
@@ -107,79 +398,60 @@ end
 -- Toggles
 createToggle("FarmToggle", "Otomatik Yemek Ye", UDim2.new(0, 20, 0, 85), Config.AutoFarm, function(state)
     Config.AutoFarm = state
-    if not state then StatusLabel.Text = "Durum: Duraklatildi" end
+    if not state then StatusLabel.Text = "Durum: Durduruldu" end
 end)
 createToggle("SellToggle", "Otomatik Sat", UDim2.new(0, 20, 0, 135), Config.AutoSell, function(state)
     Config.AutoSell = state
 end)
--- Method Switcher
-local MethodBtn = Instance.new("TextButton")
-MethodBtn.Size = UDim2.new(0, 240, 0, 40)
-MethodBtn.Position = UDim2.new(0, 20, 0, 185)
-MethodBtn.BackgroundColor3 = Color3.fromRGB(44, 62, 80)
-MethodBtn.Font = Enum.Font.GothamBold
-MethodBtn.Text = "Yontem: " .. Config.FarmMethod
-MethodBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-MethodBtn.TextSize = 13
-MethodBtn.Parent = MainFrame
-Instance.new("UICorner", MethodBtn).CornerRadius = UDim.new(0, 6)
-MethodBtn.MouseButton1Click:Connect(function()
-    if Config.FarmMethod == "Teleport Food" then
-        Config.FarmMethod = "Walk to Food"
-    else
-        Config.FarmMethod = "Teleport Food"
-    end
-    MethodBtn.Text = "Yontem: " .. Config.FarmMethod
-end)
 -- Speed Controls
 local SpeedLabel = Instance.new("TextLabel")
 SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
-SpeedLabel.Position = UDim2.new(0, 0, 0, 235)
+SpeedLabel.Position = UDim2.new(0, 0, 0, 185)
 SpeedLabel.BackgroundTransparency = 1
 SpeedLabel.Font = Enum.Font.GothamSemibold
-SpeedLabel.Text = "Tween Hizi: " .. Config.FarmSpeed
+SpeedLabel.Text = "Haraket Hizi: " .. Config.FarmSpeed
 SpeedLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 SpeedLabel.TextSize = 12
 SpeedLabel.Parent = MainFrame
 local SpeedUp = Instance.new("TextButton")
 SpeedUp.Size = UDim2.new(0, 115, 0, 35)
-SpeedUp.Position = UDim2.new(0, 20, 0, 260)
+SpeedUp.Position = UDim2.new(0, 20, 0, 210)
 SpeedUp.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 SpeedUp.Font = Enum.Font.GothamBold
-SpeedUp.Text = "Hizli (+10)"
+SpeedUp.Text = "Hizlandir (+10)"
 SpeedUp.TextColor3 = Color3.fromRGB(0, 255, 120)
 SpeedUp.TextSize = 12
 SpeedUp.Parent = MainFrame
 Instance.new("UICorner", SpeedUp).CornerRadius = UDim.new(0, 6)
 SpeedUp.MouseButton1Click:Connect(function()
     Config.FarmSpeed = math.min(300, Config.FarmSpeed + 10)
-    SpeedLabel.Text = "Tween Hizi: " .. Config.FarmSpeed
+    SpeedLabel.Text = "Haraket Hizi: " .. Config.FarmSpeed
 end)
 local SpeedDown = Instance.new("TextButton")
 SpeedDown.Size = UDim2.new(0, 115, 0, 35)
-SpeedDown.Position = UDim2.new(0, 145, 0, 260)
+SpeedDown.Position = UDim2.new(0, 145, 0, 210)
 SpeedDown.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 SpeedDown.Font = Enum.Font.GothamBold
-SpeedDown.Text = "Yavas (-10)"
+SpeedDown.Text = "Yavaslat (-10)"
 SpeedDown.TextColor3 = Color3.fromRGB(255, 100, 100)
 SpeedDown.TextSize = 12
 SpeedDown.Parent = MainFrame
 Instance.new("UICorner", SpeedDown).CornerRadius = UDim.new(0, 6)
 SpeedDown.MouseButton1Click:Connect(function()
     Config.FarmSpeed = math.max(10, Config.FarmSpeed - 10)
-    SpeedLabel.Text = "Tween Hizi: " .. Config.FarmSpeed
+    SpeedLabel.Text = "Haraket Hizi: " .. Config.FarmSpeed
 end)
--- Debug Scanner Button
-local DebugBtn = Instance.new("TextButton")
-DebugBtn.Size = UDim2.new(0, 240, 0, 40)
-DebugBtn.Position = UDim2.new(0, 20, 0, 310)
-DebugBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
-DebugBtn.Font = Enum.Font.GothamBold
-DebugBtn.Text = "Cozumle / Hatalari Tara"
-DebugBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-DebugBtn.TextSize = 13
-DebugBtn.Parent = MainFrame
-Instance.new("UICorner", DebugBtn).CornerRadius = UDim.new(0, 6)
+-- Help Label
+local HelpLabel = Instance.new("TextLabel")
+HelpLabel.Size = UDim2.new(1, -40, 0, 60)
+HelpLabel.Position = UDim2.new(0, 20, 0, 255)
+HelpLabel.BackgroundTransparency = 1
+HelpLabel.Font = Enum.Font.Gotham
+HelpLabel.Text = "Hile otomatik olarak en yakin Tiklanabilir (ClickDetector) blogu bulur, yanina gider ve yer."
+HelpLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+HelpLabel.TextSize = 11
+HelpLabel.TextWrapped = true
+HelpLabel.Parent = MainFrame
 -- Minimize Button
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -197,132 +469,130 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         MainFrame:TweenSize(UDim2.new(0, 280, 0, 50), "Out", "Quad", 0.3, true)
         MinimizeBtn.Text = "+"
     else
-        MainFrame:TweenSize(UDim2.new(0, 280, 0, 410), "Out", "Quad", 0.3, true)
+        MainFrame:TweenSize(UDim2.new(0, 280, 0, 360), "Out", "Quad", 0.3, true)
         MinimizeBtn.Text = "-"
     end
 end)
--- Debug Scanner Logic
-DebugBtn.MouseButton1Click:Connect(function()
-    StatusLabel.Text = "Durum: Taramaya baslandi."
-    pcall(function()
-        print("----- EAT THE WORLD SCANNER RESULTS -----")
-        local stats = LocalPlayer:FindFirstChild("leaderstats")
-        if stats then
-            for _, child in ipairs(stats:GetChildren()) do
-                print("Leaderstat: " .. tostring(child.Name) .. " = " .. tostring(child.Value))
-            end
-        else
-            print("Leaderstats bulunamadi!")
-        end
-        
-        print("Workspace nesneleri:")
-        for _, child in ipairs(workspace:GetChildren()) do
-            if child.ClassName == "Folder" or child.ClassName == "Model" then
-                print("Klasor/Model: " .. tostring(child.Name))
-            end
-        end
-        print("-----------------------------------------")
-    end)
-end)
--- Game Functions
+-- Character helper
 local function getCharacterParts()
     local char = LocalPlayer.Character
     if not char then return nil, nil end
     return char:FindFirstChild("HumanoidRootPart"), char:FindFirstChildOfClass("Humanoid")
 end
-local function isFood(obj)
-    local name = obj.Name:lower()
-    for _, food in ipairs(Config.FoodNames) do
-        if name:find(food:lower()) then return true end
-    end
-    return false
-end
-local function getFoods()
-    local foods = {}
-    for _, folderName in ipairs(Config.FoodFolderNames) do
-        local f = workspace:FindFirstChild(folderName)
-        if f then
-            for _, child in ipairs(f:GetChildren()) do
-                if child:IsA("BasePart") or (child:IsA("Model") and child.PrimaryPart) then
-                    table.insert(foods, child)
-                end
+-- Find all ClickDetectors in Workspace (represents eatable items)
+local function getClickDetectors()
+    local list = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ClickDetector") then
+            -- Avoid clicking UI buttons or things not in Workspace models
+            local parent = obj.Parent
+            if parent and parent:IsA("BasePart") and not parent:IsDescendantOf(LocalPlayer) then
+                table.insert(list, obj)
             end
         end
     end
-    for _, child in ipairs(workspace:GetChildren()) do
-        if isFood(child) then
-            if child:IsA("BasePart") or (child:IsA("Model") and child.PrimaryPart) then
-                table.insert(foods, child)
-            end
-        end
-    end
-    return foods
+    return list
 end
-local function getNearestFood()
+-- Find Nearest ClickDetector
+local function getNearestClickDetector()
     local hrp = getCharacterParts()
     if not hrp then return nil end
-    local nearest, dist = nil, Config.MaxDistance
-    for _, food in ipairs(getFoods()) do
-        local pos = food:IsA("BasePart") and food.Position or food.PrimaryPart.Position
-        local d = (hrp.Position - pos).Magnitude
-        if d < dist then
-            dist = d
-            nearest = food
+    
+    local detectors = getClickDetectors()
+    local nearest = nil
+    local shortestDistance = Config.MaxDistance
+    
+    for _, cd in ipairs(detectors) do
+        local parent = cd.Parent
+        if parent then
+            local dist = (hrp.Position - parent.Position).Magnitude
+            if dist < shortestDistance then
+                shortestDistance = dist
+                nearest = cd
+            end
         end
     end
+    
     return nearest
 end
+-- Find Sell ring / area
 local function getSellPart()
-    for _, name in ipairs({"Sell", "SellArea", "SellRing", "SellPart", "Sat", "SatAlani"}) do
+    local names = {"Sell", "SellArea", "SellRing", "SellPart", "Sat", "SatAlani", "Sell Zone"}
+    for _, name in ipairs(names) do
         local part = workspace:FindFirstChild(name, true)
-        if part and part:IsA("BasePart") then return part end
+        if part and part:IsA("BasePart") then
+            return part
+        end
     end
     return nil
 end
+-- Capacity check
 local function isFull()
     local stats = LocalPlayer:FindFirstChild("leaderstats")
     if stats then
         local current = stats:FindFirstChild("Food") or stats:FindFirstChild("Weight") or stats:FindFirstChild("Size") or stats:FindFirstChild("Cubes")
         local capacity = stats:FindFirstChild("MaxFood") or stats:FindFirstChild("Capacity") or stats:FindFirstChild("MaxWeight")
+        
         if current and capacity then
             return current.Value >= capacity.Value
         end
     end
     return false
 end
+-- Move Character
 local function tweenTo(pos, speed)
     local hrp = getCharacterParts()
     if not hrp then return end
-    local duration = (hrp.Position - pos).Magnitude / speed
+    
+    local distance = (hrp.Position - pos).Magnitude
+    if distance < 3 then return end -- already there
+    
+    local duration = distance / speed
     local tween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = CFrame.new(pos)})
     tween:Play()
     tween.Completed:Wait()
 end
+-- Main Farming loop
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        task.wait(0.05)
+        
         if Config.AutoFarm then
             local hrp, hum = getCharacterParts()
             if hrp and hum then
+                -- Auto Sell Check
                 if Config.AutoSell and isFull() then
-                    StatusLabel.Text = "Durum: Satis yapiliyor..."
+                    StatusLabel.Text = "Durum: Satis Alanina Gidiliyor..."
                     local sell = getSellPart()
                     if sell then
-                        tweenTo(sell.Position, Config.FarmSpeed)
-                        task.wait(0.5)
+                        tweenTo(sell.Position + Vector3.new(0, 2, 0), Config.FarmSpeed)
+                        task.wait(0.6)
+                    else
+                        StatusLabel.Text = "Hata: Satis Alani Bulunamadi!"
                     end
                 else
-                    local food = getNearestFood()
-                    if food then
-                        local part = food:IsA("BasePart") and food or food.PrimaryPart
-                        if part then
-                            if Config.FarmMethod == "Teleport Food" then
-                                pcall(function() part.CFrame = hrp.CFrame end)
-                            else
-                                StatusLabel.Text = "Durum: Yemek yeniyor..."
-                                tweenTo(part.Position, Config.FarmSpeed)
-                            end
+                    -- Auto Eat Check
+                    local cd = getNearestClickDetector()
+                    if cd and cd.Parent then
+                        local block = cd.Parent
+                        local dist = (hrp.Position - block.Position).Magnitude
+                        
+                        -- If too far, move close to the click detector
+                        if dist > Config.ActivationRange then
+                            StatusLabel.Text = "Durum: Bloga yaklasiliyor..."
+                            tweenTo(block.Position + Vector3.new(0, 1.5, 0), Config.FarmSpeed)
                         end
+                        
+                        -- Fire Click Detector
+                        StatusLabel.Text = "Durum: Blok yeniyor..."
+                        if fireclickdetector then
+                            pcall(function()
+                                fireclickdetector(cd, 0) -- Fire click detector event
+                            end)
+                        end
+                        task.wait(0.05)
+                    else
+                        StatusLabel.Text = "Durum: Yenilebilir blok araniyor..."
                     end
                 end
             end
@@ -330,4 +600,3 @@ task.spawn(function()
     end
 end)
 print("Eat the World Pro loaded successfully!")
-
