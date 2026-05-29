@@ -4,9 +4,9 @@
     
     This script is specifically optimized for Eat the World simulators on Roblox.
     Features:
+    - Extremely safe execution check (pcall GUI creation)
     - Auto Eat: Teleports Food (Cubes/Boxes) directly to the player OR Tweens the player to the Food.
     - Auto Sell: Smoothly travels to the sell rings when the capacity is full.
-    - Customizable GUI with Speed Slider and Mode Switch.
 --]]
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -15,27 +15,35 @@ local LocalPlayer = Players.LocalPlayer
 local Config = {
     AutoFarm = false,
     AutoSell = false,
-    FarmMethod = "Teleport Food", -- "Teleport Food" or "Walk to Food"
+    FarmMethod = "Walk to Food",
     FarmSpeed = 60,
     MaxDistance = 2000,
-    FoodNames = {"Cube", "Box", "Food", "Fruit", "Apple", "Banana", "Orange", "Eatable"},
+    FoodNames = {"Cube", "Box", "Food", "Fruit", "Apple", "Banana", "Orange", "Eatable", "Weight", "Size"},
     FoodFolderNames = {"Food", "Foods", "Fruits", "SpawnedFood", "FoodSpawns", "WorldItems", "Cubes", "Boxes"}
 }
--- UI Setup (Premium Dark Neon Theme)
+-- Safe GUI creation
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "EatWorldProHub"
 ScreenGui.ResetOnSpawn = false
--- Executor protection support
-if syn and syn.protect_gui then
-    syn.protect_gui(ScreenGui)
-elseif gethui then
-    ScreenGui.Parent = gethui()
-else
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- Use pcall to avoid executor errors during parenting
+local success, err = pcall(function()
+    if gethui then
+        ScreenGui.Parent = gethui()
+    elseif syn and syn.protect_gui then
+        syn.protect_gui(ScreenGui)
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    else
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+end)
+if not success or not ScreenGui.Parent then
+    pcall(function()
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end)
 end
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 280, 0, 360)
+MainFrame.Size = UDim2.new(0, 280, 0, 410)
 MainFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BackgroundTransparency = 0.1
@@ -46,7 +54,7 @@ MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 12)
 UICorner.Parent = MainFrame
--- Premium Gradient Border Effect
+-- Border
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 2
 UIStroke.Color = Color3.fromRGB(0, 180, 255)
@@ -66,7 +74,7 @@ StatusLabel.Size = UDim2.new(1, 0, 0, 30)
 StatusLabel.Position = UDim2.new(0, 0, 0, 45)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Font = Enum.Font.GothamSemibold
-StatusLabel.Text = "Durum: Baglanti kuruldu."
+StatusLabel.Text = "Durum: Script Yuklendi."
 StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 StatusLabel.TextSize = 12
 StatusLabel.Parent = MainFrame
@@ -104,7 +112,7 @@ end)
 createToggle("SellToggle", "Otomatik Sat", UDim2.new(0, 20, 0, 135), Config.AutoSell, function(state)
     Config.AutoSell = state
 end)
--- Method Switcher (Teleport Food vs Walk)
+-- Method Switcher
 local MethodBtn = Instance.new("TextButton")
 MethodBtn.Size = UDim2.new(0, 240, 0, 40)
 MethodBtn.Position = UDim2.new(0, 20, 0, 185)
@@ -161,6 +169,17 @@ SpeedDown.MouseButton1Click:Connect(function()
     Config.FarmSpeed = math.max(10, Config.FarmSpeed - 10)
     SpeedLabel.Text = "Tween Hizi: " .. Config.FarmSpeed
 end)
+-- Debug Scanner Button
+local DebugBtn = Instance.new("TextButton")
+DebugBtn.Size = UDim2.new(0, 240, 0, 40)
+DebugBtn.Position = UDim2.new(0, 20, 0, 310)
+DebugBtn.BackgroundColor3 = Color3.fromRGB(230, 126, 34)
+DebugBtn.Font = Enum.Font.GothamBold
+DebugBtn.Text = "Cozumle / Hatalari Tara"
+DebugBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+DebugBtn.TextSize = 13
+DebugBtn.Parent = MainFrame
+Instance.new("UICorner", DebugBtn).CornerRadius = UDim.new(0, 6)
 -- Minimize Button
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -178,158 +197,137 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         MainFrame:TweenSize(UDim2.new(0, 280, 0, 50), "Out", "Quad", 0.3, true)
         MinimizeBtn.Text = "+"
     else
-        MainFrame:TweenSize(UDim2.new(0, 280, 0, 360), "Out", "Quad", 0.3, true)
+        MainFrame:TweenSize(UDim2.new(0, 280, 0, 410), "Out", "Quad", 0.3, true)
         MinimizeBtn.Text = "-"
     end
 end)
--- Game Specific Functions
--- Find Character Parts
+-- Debug Scanner Logic
+DebugBtn.MouseButton1Click:Connect(function()
+    StatusLabel.Text = "Durum: Taramaya baslandi."
+    pcall(function()
+        print("----- EAT THE WORLD SCANNER RESULTS -----")
+        local stats = LocalPlayer:FindFirstChild("leaderstats")
+        if stats then
+            for _, child in ipairs(stats:GetChildren()) do
+                print("Leaderstat: " .. tostring(child.Name) .. " = " .. tostring(child.Value))
+            end
+        else
+            print("Leaderstats bulunamadi!")
+        end
+        
+        print("Workspace nesneleri:")
+        for _, child in ipairs(workspace:GetChildren()) do
+            if child.ClassName == "Folder" or child.ClassName == "Model" then
+                print("Klasor/Model: " .. tostring(child.Name))
+            end
+        end
+        print("-----------------------------------------")
+    end)
+end)
+-- Game Functions
 local function getCharacterParts()
     local char = LocalPlayer.Character
     if not char then return nil, nil end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    return hrp, hum
+    return char:FindFirstChild("HumanoidRootPart"), char:FindFirstChildOfClass("Humanoid")
 end
--- Safely check if a name matches potential food names
 local function isFood(obj)
-    local nameLower = obj.Name:lower()
-    for _, foodName in ipairs(Config.FoodNames) do
-        if nameLower:find(foodName:lower()) then
-            return true
-        end
+    local name = obj.Name:lower()
+    for _, food in ipairs(Config.FoodNames) do
+        if name:find(food:lower()) then return true end
     end
     return false
 end
--- Find all food items in workspace
 local function getFoods()
-    local foodList = {}
-    
-    -- First check common food folders
+    local foods = {}
     for _, folderName in ipairs(Config.FoodFolderNames) do
-        local folder = workspace:FindFirstChild(folderName)
-        if folder then
-            for _, child in ipairs(folder:GetChildren()) do
+        local f = workspace:FindFirstChild(folderName)
+        if f then
+            for _, child in ipairs(f:GetChildren()) do
                 if child:IsA("BasePart") or (child:IsA("Model") and child.PrimaryPart) then
-                    table.insert(foodList, child)
+                    table.insert(foods, child)
                 end
             end
         end
     end
-    
-    -- Also search general workspace to cover games without dedicated food folders
     for _, child in ipairs(workspace:GetChildren()) do
         if isFood(child) then
             if child:IsA("BasePart") or (child:IsA("Model") and child.PrimaryPart) then
-                table.insert(foodList, child)
+                table.insert(foods, child)
             end
         end
     end
-    
-    return foodList
+    return foods
 end
--- Find Nearest Food
 local function getNearestFood()
     local hrp = getCharacterParts()
     if not hrp then return nil end
-    
-    local foods = getFoods()
-    local nearest = nil
-    local shortestDistance = Config.MaxDistance
-    
-    for _, food in ipairs(foods) do
+    local nearest, dist = nil, Config.MaxDistance
+    for _, food in ipairs(getFoods()) do
         local pos = food:IsA("BasePart") and food.Position or food.PrimaryPart.Position
-        local dist = (hrp.Position - pos).Magnitude
-        if dist < shortestDistance then
-            shortestDistance = dist
+        local d = (hrp.Position - pos).Magnitude
+        if d < dist then
+            dist = d
             nearest = food
         end
     end
-    
     return nearest
 end
--- Find Sell Area Specifically
 local function getSellPart()
-    local names = {"Sell", "SellArea", "SellRing", "SellPart", "SellPlace", "Sell Zone"}
-    for _, name in ipairs(names) do
+    for _, name in ipairs({"Sell", "SellArea", "SellRing", "SellPart", "Sat", "SatAlani"}) do
         local part = workspace:FindFirstChild(name, true)
-        if part and part:IsA("BasePart") then
-            return part
-        end
+        if part and part:IsA("BasePart") then return part end
     end
     return nil
 end
--- Check Leaderstat capacity
 local function isFull()
-    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-    if leaderstats then
-        -- Common leaderstat names for Eat the World / Size simulators
-        local foodValue = leaderstats:FindFirstChild("Food") or leaderstats:FindFirstChild("Weight") or leaderstats:FindFirstChild("Size") or leaderstats:FindFirstChild("Cubes")
-        local capacityValue = leaderstats:FindFirstChild("MaxFood") or leaderstats:FindFirstChild("Capacity") or leaderstats:FindFirstChild("MaxWeight") or leaderstats:FindFirstChild("MaxSize")
-        
-        if foodValue and capacityValue then
-            return foodValue.Value >= capacityValue.Value
+    local stats = LocalPlayer:FindFirstChild("leaderstats")
+    if stats then
+        local current = stats:FindFirstChild("Food") or stats:FindFirstChild("Weight") or stats:FindFirstChild("Size") or stats:FindFirstChild("Cubes")
+        local capacity = stats:FindFirstChild("MaxFood") or stats:FindFirstChild("Capacity") or stats:FindFirstChild("MaxWeight")
+        if current and capacity then
+            return current.Value >= capacity.Value
         end
     end
     return false
 end
--- Movement (Tween Character)
-local function tweenTo(targetPosition, speed)
-    local hrp, hum = getCharacterParts()
-    if not hrp or not hum then return end
-    
-    local distance = (hrp.Position - targetPosition).Magnitude
-    local duration = distance / speed
-    
-    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPosition)})
+local function tweenTo(pos, speed)
+    local hrp = getCharacterParts()
+    if not hrp then return end
+    local duration = (hrp.Position - pos).Magnitude / speed
+    local tween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = CFrame.new(pos)})
     tween:Play()
     tween.Completed:Wait()
 end
--- Main Automation Loop
 task.spawn(function()
     while true do
-        task.wait(0.05)
-        
+        task.wait(0.1)
         if Config.AutoFarm then
             local hrp, hum = getCharacterParts()
             if hrp and hum then
-                -- Check if capacity is full and auto sell is toggled
                 if Config.AutoSell and isFull() then
-                    StatusLabel.Text = "Durum: Çanta Dolu! Satılıyor..."
-                    local sellPart = getSellPart()
-                    if sellPart then
-                        tweenTo(sellPart.Position + Vector3.new(0, 2, 0), Config.FarmSpeed)
-                        task.wait(0.5) -- wait for sale to finish
-                    else
-                        StatusLabel.Text = "Hata: Satış alanı bulunamadı!"
+                    StatusLabel.Text = "Durum: Satis yapiliyor..."
+                    local sell = getSellPart()
+                    if sell then
+                        tweenTo(sell.Position, Config.FarmSpeed)
+                        task.wait(0.5)
                     end
                 else
-                    -- Farm Loop
-                    local nearestFood = getNearestFood()
-                    if nearestFood then
-                        local targetPart = nearestFood:IsA("BasePart") and nearestFood or nearestFood.PrimaryPart
-                        if targetPart then
+                    local food = getNearestFood()
+                    if food then
+                        local part = food:IsA("BasePart") and food or food.PrimaryPart
+                        if part then
                             if Config.FarmMethod == "Teleport Food" then
-                                -- Bring the food to character CFrame (Instant collect)
-                                StatusLabel.Text = "Durum: Yiyecek çekiliyor..."
-                                -- Try setting network ownership/CFrame if game allows it
-                                pcall(function()
-                                    targetPart.CFrame = hrp.CFrame
-                                end)
-                                task.wait(0.05)
+                                pcall(function() part.CFrame = hrp.CFrame end)
                             else
-                                -- Walk/Tween character to food
-                                StatusLabel.Text = "Durum: Yiyeceğe gidiliyor..."
-                                tweenTo(targetPart.Position + Vector3.new(0, 1, 0), Config.FarmSpeed)
+                                StatusLabel.Text = "Durum: Yemek yeniyor..."
+                                tweenTo(part.Position, Config.FarmSpeed)
                             end
                         end
-                    else
-                        StatusLabel.Text = "Durum: Yakında yiyecek yok, aranıyor..."
                     end
                 end
             end
         end
     end
 end)
-print("Eat the World Pro Hub successfully loaded!")
+print("Eat the World Pro loaded successfully!")
+
